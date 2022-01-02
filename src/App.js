@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 import MoviesList from './components/MoviesList';
+import AddMovie from './components/AddMovie';
 import './App.css';
 
 function App() {
@@ -8,49 +9,79 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const  fetchMoviesHandler = useCallback(async () => {
+  const fetchMoviesHandler = useCallback(async () => {
     setIsLoading(true);
     setError(null);
-    try{
-    const response = await fetch("https://swapi.py4e.com/api/films/");
-    if(!response.ok){
-      setIsLoading(false);
-      throw new Error("An error occured during the fetching of movies!");
-    }
-    const data = await response.json();
-    const movies = data.results.map((movie) => {
-        return {
-            id: movie.episode_id,
-            title: movie.title,
-            releaseDate: movie.release_date,
-            openingText: movie.opening_crawl,
-        };
-      });
-      setMovies(movies);
-    }catch(error){
+    try {
+      const response = await fetch("https://react-http-request-a7926-default-rtdb.europe-west1.firebasedatabase.app/movies.json");
+      if (!response.ok) {
+        throw new Error('Something went wrong!');
+      }
+      const data = await response.json();
+      if(!data){
+         throw new Error("Mo movies found!");
+      }
+
+      const transformedMovies = [];
+      
+      for(let key in data){
+        transformedMovies.push({
+            id: key,
+            title: data[key].title,
+            openingText: data[key].openingText,
+            releaseDate: data[key].releaseDate,
+        });
+      }
+      setMovies(transformedMovies);
+    } catch (error) {
       setError(error.message);
-    }finally{
-      setIsLoading(false);
     }
+    setIsLoading(false);
   }, []);
 
   useEffect(() => {
-      fetchMoviesHandler();
+    fetchMoviesHandler();
   }, [fetchMoviesHandler]);
 
-  
+  async function addMovieHandler(movie) {
+    const response = await fetch("https://react-http-request-a7926-default-rtdb.europe-west1.firebasedatabase.app/movies.json", {
+      method: 'POST',
+      headers : new Headers({
+                "Content-Type": "application/json"
+              }),
+      body: JSON.stringify(movie)
+    });
+    if(response.ok){
+      fetchMoviesHandler();
+    }else{
+      setError("Impossible to add movies");
+    }
+  }
+
+  let content = <p>Found no movies.</p>;
+
+  if (movies.length > 0) {
+    content = <MoviesList movies={movies} />;
+  }
+
+  if (error) {
+    content = <p>{error}</p>;
+  }
+
+  if (isLoading) {
+    content = <p>Loading...</p>;
+  }
+
   return (
-      <React.Fragment>
-          <section>
-              <button onClick={fetchMoviesHandler}>Fetch Movies</button>
-          </section>
-          <section>
-              {!isLoading && movies.length > 0 && <MoviesList movies={movies} />}
-              {!isLoading && !error && movies.length === 0 && <p>Mo movies found</p>}
-              {!isLoading && error && <p>{error}</p>}
-              {isLoading && <p>Movies are loading...</p>}
-          </section>
-      </React.Fragment>
+    <React.Fragment>
+      <section>
+        <AddMovie onAddMovie={addMovieHandler} />
+      </section>
+      <section>
+        <button onClick={fetchMoviesHandler}>Fetch Movies</button>
+      </section>
+      <section>{content}</section>
+    </React.Fragment>
   );
 }
 
